@@ -5,7 +5,7 @@ namespace common\models;
 use Yii;
 
 /**
- * This is the model class for table "grade".
+ * This is the model class for table "{{%grade}}".
  *
  * @property int $id
  * @property int $student_id
@@ -26,7 +26,7 @@ class Grade extends \yii\db\ActiveRecord
      */
     public static function tableName()
     {
-        return 'grade';
+        return '{{%grade}}';
     }
 
     /**

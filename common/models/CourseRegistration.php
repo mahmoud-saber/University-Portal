@@ -5,7 +5,7 @@ namespace common\models;
 use Yii;
 
 /**
- * This is the model class for table "course_registration".
+ * This is the model class for table "{{%course_registration}}".
  *
  * @property int $id
  * @property int $student_id
@@ -24,7 +24,7 @@ class CourseRegistration extends \yii\db\ActiveRecord
      */
     public static function tableName()
     {
-        return 'course_registration';
+        return '{{%course_registration}}';
     }
 
     /**

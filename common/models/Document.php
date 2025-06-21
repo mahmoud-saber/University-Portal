@@ -5,7 +5,7 @@ namespace common\models;
 use Yii;
 
 /**
- * This is the model class for table "document".
+ * This is the model class for table "{{%document}}".
  *
  * @property int $id
  * @property int $user_id
@@ -25,7 +25,7 @@ class Document extends \yii\db\ActiveRecord
      */
     public static function tableName()
     {
-        return 'document';
+        return '{{%document}}';
     }
 
     /**
