@@ -5,7 +5,7 @@ namespace common\models;
 use Yii;
 
 /**
- * This is the model class for table "user".
+ * This is the model class for table "{{%user}}".
  *
  * @property int $id
  * @property string $username
@@ -34,7 +34,7 @@ class User extends \yii\db\ActiveRecord
      */
     public static function tableName()
     {
-        return 'user';
+        return '{{%user}}';
     }
 
     /**
@@ -46,7 +46,7 @@ class User extends \yii\db\ActiveRecord
             [['password_reset_token', 'verification_token', 'access_token'], 'default', 'value' => null],
             [['status'], 'default', 'value' => 10],
             [['role'], 'default', 'value' => 'student'],
-            [['username', 'auth_key', 'password_hash', 'email'], 'required'],
+            [['username', 'auth_key', 'password_hash', 'email', 'created_at', 'updated_at'], 'required'],
             [['status', 'created_at', 'updated_at'], 'integer'],
             [['username', 'password_hash', 'password_reset_token', 'email', 'verification_token', 'access_token'], 'string', 'max' => 255],
             [['auth_key'], 'string', 'max' => 32],
@@ -118,4 +118,5 @@ class User extends \yii\db\ActiveRecord
     {
         return $this->hasMany(Grade::class, ['student_id' => 'id']);
     }
+
 }
