@@ -3,20 +3,28 @@
 namespace common\models;
 
 use Yii;
+use common\models\Grade;
+use yii\db\ActiveRecord;
+use common\models\Course;
+use common\models\Document;
+use yii\web\IdentityInterface;
+use yii\base\NotSupportedException;
+use yii\behaviors\TimestampBehavior;
+use common\models\CourseRegistration;
 
 /**
- * This is the model class for table "{{%user}}".
+ * User model
  *
  * @property int $id
  * @property string $username
  * @property string $auth_key
  * @property string $password_hash
  * @property string|null $password_reset_token
+ * @property string|null $verification_token
  * @property string $email
  * @property int $status
  * @property int $created_at
  * @property int $updated_at
- * @property string|null $verification_token
  * @property string $role
  * @property string|null $access_token
  *
@@ -25,49 +33,42 @@ use Yii;
  * @property Document[] $documents
  * @property Grade[] $grades
  */
-class User extends \yii\db\ActiveRecord
+class User extends ActiveRecord implements IdentityInterface
 {
+    const STATUS_DELETED = 0;
+    const STATUS_INACTIVE = 9;
+    const STATUS_ACTIVE = 10;
 
-    /**
-     * ENUM field values
-     */
     const ROLE_TEACHER = 'teacher';
     const ROLE_ADMIN = 'admin';
     const ROLE_STUDENT = 'student';
 
-    /**
-     * {@inheritdoc}
-     */
     public static function tableName()
     {
         return '{{%user}}';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function rules()
+    public function behaviors()
     {
         return [
-            [['password_reset_token', 'verification_token', 'access_token'], 'default', 'value' => null],
-            [['status'], 'default', 'value' => 10],
-            [['role'], 'default', 'value' => 'student'],
-            [['username', 'auth_key', 'password_hash', 'email', 'created_at', 'updated_at'], 'required'],
-            [['status', 'created_at', 'updated_at'], 'integer'],
-            [['role'], 'string'],
-            [['username', 'password_hash', 'password_reset_token', 'email', 'verification_token', 'access_token'], 'string', 'max' => 255],
-            [['auth_key'], 'string', 'max' => 32],
-            ['role', 'in', 'range' => array_keys(self::optsRole())],
-            [['username'], 'unique'],
-            [['email'], 'unique'],
-            [['password_reset_token'], 'unique'],
-            [['access_token'], 'unique'],
+            TimestampBehavior::class,
         ];
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    public function rules()
+    {
+        return [
+            [['username', 'password_hash', 'email','role'], 'required'],
+            [['status', 'created_at', 'updated_at'], 'integer'],
+            [['username', 'password_hash', 'password_reset_token', 'email', 'verification_token', 'access_token'], 'string', 'max' => 255],
+            [['auth_key'], 'string', 'max' => 32],
+            [['username', 'email', 'password_reset_token', 'access_token'], 'unique'],
+            [['role'], 'default', 'value' => self::ROLE_STUDENT],
+            [['status'], 'default', 'value' => self::STATUS_ACTIVE],
+            ['role', 'in', 'range' => array_keys(self::optsRole())],
+        ];
+    }
+
     public function attributeLabels()
     {
         return [
@@ -76,84 +77,87 @@ class User extends \yii\db\ActiveRecord
             'auth_key' => 'Auth Key',
             'password_hash' => 'Password Hash',
             'password_reset_token' => 'Password Reset Token',
+            'verification_token' => 'Verification Token',
             'email' => 'Email',
             'status' => 'Status',
             'created_at' => 'Created At',
             'updated_at' => 'Updated At',
-            'verification_token' => 'Verification Token',
             'role' => 'Role',
             'access_token' => 'Access Token',
         ];
     }
 
-    /**
-     * Gets query for [[CourseRegistrations]].
-     *
-     * @return \yii\db\ActiveQuery
-     */
-    public function getCourseRegistrations()
+    public static function findIdentity($id)
     {
-        return $this->hasMany(CourseRegistration::class, ['student_id' => 'id']);
+        return static::findOne(['id' => $id, 'status' => self::STATUS_ACTIVE]);
     }
 
-    /**
-     * Gets query for [[Courses]].
-     *
-     * @return \yii\db\ActiveQuery
-     */
-    public function getCourses()
+    public static function findIdentityByAccessToken($token, $type = null)
     {
-        return $this->hasMany(Course::class, ['teacher_id' => 'id']);
+        return static::findOne(['access_token' => $token, 'status' => self::STATUS_ACTIVE]);
     }
 
-    /**
-     * Gets query for [[Documents]].
-     *
-     * @return \yii\db\ActiveQuery
-     */
-    public function getDocuments()
+    public static function findByUsername($username)
     {
-        return $this->hasMany(Document::class, ['user_id' => 'id']);
+        return static::findOne(['username' => $username, 'status' => self::STATUS_ACTIVE]);
     }
 
-    /**
-     * Gets query for [[Grades]].
-     *
-     * @return \yii\db\ActiveQuery
-     */
-    public function getGrades()
+    public static function findByPasswordResetToken($token)
     {
-        return $this->hasMany(Grade::class, ['student_id' => 'id']);
+        if (!static::isPasswordResetTokenValid($token)) {
+            return null;
+        }
+        return static::findOne([
+            'password_reset_token' => $token,
+            'status' => self::STATUS_ACTIVE,
+        ]);
     }
 
+    public static function findByVerificationToken($token)
+    {
+        return static::findOne([
+            'verification_token' => $token,
+            'status' => self::STATUS_INACTIVE,
+        ]);
+    }
 
-    /**
-     * column role ENUM value labels
-     * @return string[]
-     */
+    public static function isPasswordResetTokenValid($token)
+    {
+        if (empty($token)) {
+            return false;
+        }
+        $timestamp = (int) substr($token, strrpos($token, '_') + 1);
+        $expire = Yii::$app->params['user.passwordResetTokenExpire'];
+        return $timestamp + $expire >= time();
+    }
+
     public static function optsRole()
     {
         return [
-            self::ROLE_TEACHER => 'teacher',
-            self::ROLE_ADMIN => 'admin',
-            self::ROLE_STUDENT => 'student',
+            self::ROLE_TEACHER => 'Teacher',
+            self::ROLE_ADMIN => 'Admin',
+            self::ROLE_STUDENT => 'Student',
         ];
     }
 
-    /**
-     * @return string
-     */
     public function displayRole()
     {
         return self::optsRole()[$this->role];
     }
 
-    /**
-     * @return bool
-     */
     public function isRoleTeacher()
     {
         return $this->role === self::ROLE_TEACHER;
+    }
+
+    public function isRoleAdmin()
+    {
+        return $this->role === self::ROLE_ADMIN;
+    }
+
+    public function isRoleStudent()
+    {
+        return $this->role === self::ROLE_STUDENT;
     }
 
     public function setRoleToTeacher()
@@ -161,29 +165,78 @@ class User extends \yii\db\ActiveRecord
         $this->role = self::ROLE_TEACHER;
     }
 
-    /**
-     * @return bool
-     */
-    public function isRoleAdmin()
-    {
-        return $this->role === self::ROLE_ADMIN;
-    }
-
     public function setRoleToAdmin()
     {
         $this->role = self::ROLE_ADMIN;
     }
 
-    /**
-     * @return bool
-     */
-    public function isRoleStudent()
-    {
-        return $this->role === self::ROLE_STUDENT;
-    }
-
     public function setRoleToStudent()
     {
         $this->role = self::ROLE_STUDENT;
+    }
+
+    public function getId()
+    {
+        return $this->getPrimaryKey();
+    }
+
+    public function getAuthKey()
+    {
+        return $this->auth_key;
+    }
+
+    public function validateAuthKey($authKey)
+    {
+        return $this->getAuthKey() === $authKey;
+    }
+
+    public function validatePassword($password)
+    {
+        return Yii::$app->security->validatePassword($password, $this->password_hash);
+    }
+
+    public function setPassword($password)
+    {
+        $this->password_hash = Yii::$app->security->generatePasswordHash($password);
+    }
+
+    public function generateAuthKey()
+    {
+        $this->auth_key = Yii::$app->security->generateRandomString();
+    }
+
+    public function generatePasswordResetToken()
+    {
+        $this->password_reset_token = Yii::$app->security->generateRandomString() . '_' . time();
+    }
+
+    public function generateEmailVerificationToken()
+    {
+        $this->verification_token = Yii::$app->security->generateRandomString() . '_' . time();
+    }
+
+    public function removePasswordResetToken()
+    {
+        $this->password_reset_token = null;
+    }
+
+    public function getCourseRegistrations()
+    {
+        return $this->hasMany(CourseRegistration::class, ['student_id' => 'id']);
+    }
+
+    public function getCourses()
+    {
+        return $this->hasMany(Course::class, ['teacher_id' => 'id']);
+    }
+
+    public function getDocuments()
+    {
+        return $this->hasMany(Document::class, ['user_id' => 'id']);
+    }
+
+    public function getGrades()
+    {
+        return $this->hasMany(Grade::class, ['student_id' => 'id']);
     }
 }
