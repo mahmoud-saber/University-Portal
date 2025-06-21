@@ -9,7 +9,7 @@ class m250621_145818_add_role_and_access_token_to_user_table extends Migration
      */
     public function safeUp()
     {
-        $this->addColumn('{{%user}}', 'role', $this->string(20)->defaultValue('student'));
+        $this->addColumn('{{%user}}', 'role', "ENUM('teacher','admin','student') NOT NULL DEFAULT 'student'");
         $this->addColumn('{{%user}}', 'access_token', $this->string()->unique());
     }
 
